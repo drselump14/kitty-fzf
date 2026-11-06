@@ -29,15 +29,15 @@ for bin in kitty fzf jq; do
 done
 
 list_windows() {
-  # id <TAB> display line. Skips this script's own overlay window.
+  # id <TAB> display ("tab › title") <TAB> cwd <TAB> cmd  (cwd/cmd only shown in preview label)
   kc ls | jq -r --argjson self "$self_id" '
     def short: sub("^" + env.HOME; "~");
-    to_entries[] | .key as $os | .value.tabs[] as $t | $t.windows[]
+    .[] | .tabs[] as $t | $t.windows[]
     | select(.id != $self)
-    | (.foreground_processes[0].cmdline // [] | map(split("/")[-1]) | join(" ")) as $cmd
+    | (.foreground_processes[-1].cmdline // [] | map(split("/")[-1]) | join(" ") | .[0:60]) as $cmd
     | [ (.id|tostring),
-        "\($os+1):\($t.title)",
-        (if .is_focused then "*" else " " end) + .title,
+        "\u001b[36m\($t.title)\u001b[0m \u001b[2m›\u001b[0m "
+          + (if .is_focused then "\u001b[33m*\u001b[0m" else "" end) + .title,
         (.cwd|short),
         $cmd ] | join("\t")'
 }
@@ -76,13 +76,14 @@ esac
 
 choice="$(
   $list_cmd | fzf \
-    --delimiter='\t' --with-nth=2.. --nth=2.. \
+    --delimiter='\t' --with-nth=2 \
     --ansi --reverse --cycle --tabstop=2 \
     --prompt="kitty $mode> " --header="$header" \
     --preview="$preview" --preview-window='right,55%,wrap' \
     --bind="ctrl-x:execute-silent($close_cmd)+reload($list_cmd)" \
     --bind="ctrl-r:reload($list_cmd)" \
-    --bind="ctrl-/:toggle-preview"
+    --bind="ctrl-/:toggle-preview" \
+    --bind="focus:transform-preview-label:[[ -n {3} ]] && echo ' {3}  ·  {4} '"
 )" || exit 0
 
 id="${choice%%$'\t'*}"
