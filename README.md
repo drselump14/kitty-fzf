@@ -27,8 +27,8 @@ Add key mappings to `kitty.conf` (example uses a tmux-style `ctrl+space` prefix)
 
 ```conf
 # floating centered panel
-map ctrl+space>w launch --type=os-panel --env KITTY_FZF_FONT_SIZE=14 --os-panel edge=center-sized --os-panel lines=30 --os-panel columns=140 --os-panel focus-policy=exclusive --os-panel hide-on-focus-loss=yes --os-panel layer=overlay --allow-remote-control ~/.local/bin/kitty-fzf
-map ctrl+space>t launch --type=os-panel --env KITTY_FZF_FONT_SIZE=14 --os-panel edge=center-sized --os-panel lines=30 --os-panel columns=140 --os-panel focus-policy=exclusive --os-panel hide-on-focus-loss=yes --os-panel layer=overlay --allow-remote-control ~/.local/bin/kitty-fzf tab
+map ctrl+space>w launch --type=os-panel --os-panel edge=center-sized --os-panel lines=30 --os-panel columns=140 --os-panel focus-policy=exclusive --os-panel hide-on-focus-loss=yes --os-panel layer=overlay --allow-remote-control ~/.local/bin/kitty-fzf
+map ctrl+space>t launch --type=os-panel --os-panel edge=center-sized --os-panel lines=30 --os-panel columns=140 --os-panel focus-policy=exclusive --os-panel hide-on-focus-loss=yes --os-panel layer=overlay --allow-remote-control ~/.local/bin/kitty-fzf tab
 
 # or: overlay on top of the current pane
 # map ctrl+space>w launch --type=overlay --allow-remote-control ~/.local/bin/kitty-fzf
