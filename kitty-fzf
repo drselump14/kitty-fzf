@@ -28,6 +28,13 @@ for bin in kitty fzf jq; do
   command -v "$bin" >/dev/null || { echo "kitty-fzf: missing $bin" >&2; exit 1; }
 done
 
+# Optional bigger font for the picker. Only set this when kitty-fzf runs in its own
+# OS window (os-panel / os-window): kitty font size is per OS window.
+#   map ... launch --type=os-panel --env KITTY_FZF_FONT_SIZE=14 ... kitty-fzf
+if [[ -n ${KITTY_FZF_FONT_SIZE:-} && $mode != --list-* ]]; then
+  kc set-font-size "$KITTY_FZF_FONT_SIZE" 2>/dev/null || true
+fi
+
 list_windows() {
   # id <TAB> display ("tab › title") <TAB> cwd <TAB> cmd  (cwd/cmd only shown in preview label)
   kc ls | jq -r --argjson self "$self_id" '
