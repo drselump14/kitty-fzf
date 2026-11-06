@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# kitty-fzf: fuzzy find & switch kitty windows (panes) / tabs, like tmux-fzf.
+#
+# Usage:
+#   kitty-fzf            # pick a window (pane) across all OS windows + tabs
+#   kitty-fzf tab        # pick a tab
+#
+# Keys inside fzf:
+#   enter   focus selection
+#   ctrl-x  close selection (window or tab), list reloads
+#   ctrl-r  reload list
+#   ctrl-/  toggle preview
+#
+# Requires: kitty remote control (allow_remote_control yes + listen_on), fzf, jq.
+# kitty.conf mapping (runs as an overlay over the current window):
+#   map ctrl+shift+space launch --type=overlay --allow-remote-control /path/to/kitty-fzf
+#   map ctrl+shift+t     launch --type=overlay --allow-remote-control /path/to/kitty-fzf tab
+
+set -euo pipefail
+
+mode="${1:-window}"
+self_id="${KITTY_WINDOW_ID:-0}"
+self="$(realpath "$0")"
+
+kc() { kitty @ "$@"; }
+
+for bin in kitty fzf jq; do
+  command -v "$bin" >/dev/null || { echo "kitty-fzf: missing $bin" >&2; exit 1; }
+done
+
+list_windows() {
+  # id <TAB> display line. Skips this script's own overlay window.
+  kc ls | jq -r --argjson self "$self_id" '
+    def short: sub("^" + env.HOME; "~");
+    to_entries[] | .key as $os | .value.tabs[] as $t | $t.windows[]
+    | select(.id != $self)
+    | (.foreground_processes[0].cmdline // [] | map(split("/")[-1]) | join(" ")) as $cmd
+    | [ (.id|tostring),
+        "\($os+1):\($t.title)",
+        (if .is_focused then "*" else " " end) + .title,
+        (.cwd|short),
+        $cmd ] | join("\t")'
+}
+
+list_tabs() {
+  kc ls | jq -r --argjson self "$self_id" '
+    to_entries[] | .key as $os | .value.tabs[]
+    | ([.windows[] | select(.id != $self)] | length) as $n
+    | select($n > 0)
+    | [ (.id|tostring),
+        "\($os+1)",
+        (if .is_focused then "*" else " " end) + .title,
+        "\($n) panes" ] | join("\t")'
+}
+
+case "$mode" in
+  window|pane|w|p)
+    list_cmd="$self --list-windows"
+    preview='kitty @ get-text --ansi --match id:{1} | tail -n "$FZF_PREVIEW_LINES"'
+    focus_cmd() { kc focus-window --match "id:$1"; }
+    close_cmd="kitty @ close-window --match id:{1}"
+    header="enter: focus  ctrl-x: close pane  ctrl-r: reload"
+    ;;
+  tab|t)
+    list_cmd="$self --list-tabs"
+    preview='kitty @ get-text --ansi --match "id:$(kitty @ ls | jq -r ".[].tabs[] | select(.id=={1}) | (.windows[] | select(.is_focused) | .id) // .windows[0].id" | head -1)" | tail -n "$FZF_PREVIEW_LINES"'
+    focus_cmd() { kc focus-tab --match "id:$1"; }
+    close_cmd="kitty @ close-tab --match id:{1}"
+    header="enter: focus  ctrl-x: close tab  ctrl-r: reload"
+    ;;
+  --list-windows) list_windows; exit ;;
+  --list-tabs)    list_tabs;    exit ;;
+  -h|--help) sed -n '2,17p' "$self"; exit ;;
+  *) echo "kitty-fzf: unknown mode '$mode' (window|tab)" >&2; exit 2 ;;
+esac
+
+choice="$(
+  $list_cmd | fzf \
+    --delimiter='\t' --with-nth=2.. --nth=2.. \
+    --ansi --reverse --cycle --tabstop=2 \
+    --prompt="kitty $mode> " --header="$header" \
+    --preview="$preview" --preview-window='right,55%,wrap' \
+    --bind="ctrl-x:execute-silent($close_cmd)+reload($list_cmd)" \
+    --bind="ctrl-r:reload($list_cmd)" \
+    --bind="ctrl-/:toggle-preview"
+)" || exit 0
+
+id="${choice%%$'\t'*}"
+[[ -n "$id" ]] && focus_cmd "$id"
